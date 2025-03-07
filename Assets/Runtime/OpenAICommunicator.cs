@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using OpenAI;
+using OpenAI.Audio;
 using OpenAI.Chat;
 using OpenAI.Models;
 using UnityEngine;
@@ -64,6 +65,15 @@ namespace Victeam.AIAssistant
             
             Debug.Log((string)choice.Message);
             return choice.Message;
+        }
+        
+        public async Task<AudioClip> SendTextToSpeech(string textToSpeech)
+        {
+            Debug.Log($"Sending text to speech: {textToSpeech}");
+            var request = new SpeechRequest(textToSpeech);
+            var speechClip = await client.AudioEndpoint.GetSpeechAsync(request);
+            Debug.Log(speechClip);
+            return speechClip.AudioClip;
         }
     }
 }

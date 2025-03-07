@@ -12,11 +12,15 @@ namespace Victeam.AIAssistant
     public class ImageStream : MonoBehaviour
     {
         [SerializeField] private float time = 5f;
+        [SerializeField] private AudioSource audioSourceGameobject;
+
         private float timeLeft;
+        private AudioSource audioSource;
 
         private void Start()
         {
             timeLeft = time;
+            audioSource = GetComponent<AudioSource>();
         }
 
         private void Update()
@@ -28,13 +32,15 @@ namespace Victeam.AIAssistant
             CaptureImage();
         }
 
-        private static async Task CaptureImage()
+        private async Task CaptureImage()
         {
             ScreenCapture.CaptureScreenshot("Screenshot.png");
             byte[] fileData = File.ReadAllBytes("Screenshot.png");
             var tex = new Texture2D(2, 2);
             tex.LoadImage(fileData);
-			await OpenAICommunicator.Instance.SendPrompt("Describe this image to me", tex);
+			var resultText = await OpenAICommunicator.Instance.SendPrompt("Describe this image to me", tex);
+            var resultAudioClip = await OpenAICommunicator.Instance.SendTextToSpeech(resultText);
+            audioSource.PlayOneShot(resultAudioClip);
         }
     }
 }
