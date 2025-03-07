@@ -72,5 +72,23 @@ Good luck!";
             Debug.Log((string)choice.Message);
             return choice.Message;
         }
+        
+        public async Task<string> SendPrompt(string prompt, ImageUrl promptImageUrl)
+        {
+            // Exemple of ImageUrl: new ImageUrl(
+            // "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+            // ImageDetail.Low)
+            currentConversation.Add(new Message(Role.User, new List<Content>()
+            {
+                prompt,
+                promptImageUrl
+            }));
+            var chatRequest = new ChatRequest(currentConversation, Model.GPT4_Turbo);
+            var response = await client.ChatEndpoint.GetCompletionAsync(chatRequest);
+            var choice = response.FirstChoice;
+            
+            Debug.Log((string)choice.Message);
+            return choice.Message;
+        }
     }
 }
