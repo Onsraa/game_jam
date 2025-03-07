@@ -1,13 +1,22 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 public class MicrophoneAnalyzer : MonoBehaviour
 {
+    public enum AudioMode
+    {
+        Standby,
+        Microphone,
+        AudioFile
+    }
+
     [Header("Audio Settings")]
     [SerializeField] private string microphoneDeviceName = null; // null = default device
     [SerializeField] private int sampleRate = 44100;
     [SerializeField] private int clipLength = 2; // en secondes
-    [SerializeField] private AudioSource microphoneSource;
+    [SerializeField] private AudioSource audioSource;
     [SerializeField] private bool playMicrophoneAudio = false;
+    [SerializeField] private AudioClip audioFileClip; // Pour le fichier MP3 à tester
     
     [Header("Analysis Settings")]
     [SerializeField] private int sampleDataLength = 256;
@@ -15,14 +24,17 @@ public class MicrophoneAnalyzer : MonoBehaviour
     [SerializeField] private float smoothingSpeed = 5f;
     [SerializeField] private int spectrumSize = 64;
     [SerializeField] private float spectrumMultiplier = 50f;
-    [SerializeField] private float spectrumSmoothingSpeed = 8f; // Augmenté pour une meilleure réactivité
+    [SerializeField] private float spectrumSmoothingSpeed = 8f;
+    
+    [Header("Events")]
+    public UnityEvent<string> OnSubtitleChanged;
     
     // Variables privées
     private AudioClip microphoneClip;
     private float[] sampleData;
     private float currentVolume = 0f;
     private float targetVolume = 0f;
-    private bool isMicrophoneActive = false;
+    private bool isMicrophoneInitialized = false;
     
     // Variables pour le spectre
     private float[] spectrumData;
@@ -30,11 +42,12 @@ public class MicrophoneAnalyzer : MonoBehaviour
     
     // Propriétés publiques
     public float[] SmoothedSpectrum => smoothedSpectrumData;
+    public AudioMode CurrentMode { get; private set; } = AudioMode.Standby;
     
     void Start()
     {
         InitializeAudioAnalysis();
-        StartMicrophone();
+        DetectMicrophone();
     }
     
     private void InitializeAudioAnalysis()
@@ -45,26 +58,36 @@ public class MicrophoneAnalyzer : MonoBehaviour
         smoothedSpectrumData = new float[spectrumSize];
         
         // Configurer l'AudioSource
-        if (microphoneSource == null)
+        if (audioSource == null)
         {
-            microphoneSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
+            audioSource = GetComponent<AudioSource>() ?? gameObject.AddComponent<AudioSource>();
         }
         
-        // Sélectionner le premier microphone disponible si aucun n'est spécifié
-        if (string.IsNullOrEmpty(microphoneDeviceName) && Microphone.devices.Length > 0)
+        // Initialiser l'événement si nécessaire
+        if (OnSubtitleChanged == null)
         {
-            microphoneDeviceName = Microphone.devices[0];
+            OnSubtitleChanged = new UnityEvent<string>();
         }
     }
     
-    private void StartMicrophone()
+    private void DetectMicrophone()
     {
-        if (Microphone.devices.Length == 0)
+        // Vérifier si des microphones sont disponibles
+        if (Microphone.devices.Length > 0)
         {
-            Debug.LogWarning("Aucun microphone détecté!");
-            return;
+            // Sélectionner le premier microphone
+            microphoneDeviceName = Microphone.devices[0];
+            Debug.Log("Microphone détecté automatiquement : " + microphoneDeviceName);
+            InitializeMicrophone();
         }
-        
+        else
+        {
+            Debug.LogWarning("Aucun microphone détecté !");
+        }
+    }
+    
+    private void InitializeMicrophone()
+    {
         // Créer un AudioClip pour capturer l'audio du microphone
         microphoneClip = Microphone.Start(microphoneDeviceName, true, clipLength, sampleRate);
         
@@ -77,34 +100,119 @@ public class MicrophoneAnalyzer : MonoBehaviour
         // Attendre que le microphone démarre
         while (!(Microphone.GetPosition(microphoneDeviceName) > 0)) { }
         
-        // Configurer l'AudioSource
-        microphoneSource.clip = microphoneClip;
-        microphoneSource.loop = true;
-        microphoneSource.mute = !playMicrophoneAudio;
-        microphoneSource.Play();
+        isMicrophoneInitialized = true;
         
-        isMicrophoneActive = true;
+        // Par défaut, on commence en mode standby
+        SetMode(AudioMode.Standby);
+    }
+    
+    public void SetMode(AudioMode newMode)
+    {
+        // Si on change de mode, on arrête ce qui est en cours
+        if (CurrentMode != newMode)
+        {
+            audioSource.Stop();
+        }
+        
+        CurrentMode = newMode;
+        
+        switch (newMode)
+        {
+            case AudioMode.Standby:
+                audioSource.clip = null;
+                OnSubtitleChanged?.Invoke("");
+                break;
+                
+            case AudioMode.Microphone:
+                if (isMicrophoneInitialized)
+                {
+                    audioSource.clip = microphoneClip;
+                    audioSource.loop = true;
+                    audioSource.mute = !playMicrophoneAudio;
+                    audioSource.Play();
+                    OnSubtitleChanged?.Invoke("Mode écoute activé...");
+                }
+                break;
+                
+            case AudioMode.AudioFile:
+                if (audioFileClip != null)
+                {
+                    audioSource.clip = audioFileClip;
+                    audioSource.loop = false;
+                    audioSource.mute = false;
+                    audioSource.Play();
+                    OnSubtitleChanged?.Invoke("Lecture du fichier audio...");
+                }
+                else
+                {
+                    Debug.LogWarning("Aucun fichier audio assigné !");
+                    SetMode(AudioMode.Standby);
+                }
+                break;
+        }
+    }
+    
+    public void PlayAudioFile()
+    {
+        if (audioFileClip != null)
+        {
+            SetMode(AudioMode.AudioFile);
+        }
+    }
+    
+    public void StartListening()
+    {
+        if (isMicrophoneInitialized)
+        {
+            SetMode(AudioMode.Microphone);
+        }
+    }
+    
+    public void StopListening()
+    {
+        SetMode(AudioMode.Standby);
     }
     
     void Update()
     {
-        if (!isMicrophoneActive) return;
-        
+        // Toujours analyser, même en mode standby pour les petites animations
         AnalyzeAudio();
         AnalyzeSpectrum();
+        
+        // Détecter la fin de la lecture du fichier audio
+        if (CurrentMode == AudioMode.AudioFile && !audioSource.isPlaying)
+        {
+            SetMode(AudioMode.Standby);
+        }
     }
     
     private void AnalyzeAudio()
     {
-        // Obtenir la position actuelle d'enregistrement
-        int micPosition = Microphone.GetPosition(microphoneDeviceName);
-        
-        // Éviter les indices négatifs
-        int readPosition = micPosition - sampleData.Length;
-        if (readPosition < 0) readPosition = 0;
-        
-        // Obtenir les données audio
-        microphoneClip.GetData(sampleData, readPosition);
+        if (CurrentMode == AudioMode.Microphone && isMicrophoneInitialized)
+        {
+            // Obtenir la position actuelle d'enregistrement
+            int micPosition = Microphone.GetPosition(microphoneDeviceName);
+            
+            // Éviter les indices négatifs
+            int readPosition = micPosition - sampleData.Length;
+            if (readPosition < 0) readPosition = 0;
+            
+            // Obtenir les données audio
+            microphoneClip.GetData(sampleData, readPosition);
+        }
+        else if (CurrentMode == AudioMode.AudioFile && audioSource.isPlaying)
+        {
+            // Obtenir les données audio du fichier
+            audioSource.GetOutputData(sampleData, 0);
+        }
+        else
+        {
+            // En mode standby, générer un peu de bruit aléatoire pour une légère animation
+            for (int i = 0; i < sampleData.Length; i++)
+            {
+                sampleData[i] = Random.Range(-0.01f, 0.01f);
+            }
+        }
         
         // Calculer le volume moyen
         float sum = 0;
@@ -119,8 +227,19 @@ public class MicrophoneAnalyzer : MonoBehaviour
     
     private void AnalyzeSpectrum()
     {
-        // Obtenir les données du spectre
-        microphoneSource.GetSpectrumData(spectrumData, 0, fftWindow);
+        if (audioSource.isPlaying)
+        {
+            // Obtenir les données du spectre
+            audioSource.GetSpectrumData(spectrumData, 0, fftWindow);
+        }
+        else
+        {
+            // En mode standby, générer un spectre très faible mais un peu aléatoire
+            for (int i = 0; i < spectrumSize; i++)
+            {
+                spectrumData[i] = Random.Range(0f, 0.005f) * (1f/(i+1));
+            }
+        }
         
         // Traiter et lisser les données
         for (int i = 0; i < spectrumSize; i++)
@@ -139,7 +258,7 @@ public class MicrophoneAnalyzer : MonoBehaviour
     
     void OnDestroy()
     {
-        if (isMicrophoneActive)
+        if (isMicrophoneInitialized)
         {
             Microphone.End(microphoneDeviceName);
         }

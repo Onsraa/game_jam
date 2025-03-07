@@ -16,6 +16,8 @@ Shader "Custom/SiriLikeEffect"
         _WaveSpeed("Wave Speed", Range(0.1, 5)) = 2.71
         _WaveIntensity("Wave Intensity", Range(0, 0.2)) = 0.02
         _AudioWaveIntensity("Audio Wave Intensity", Range(0, 1)) = 0.5
+        _WaveSharpness("Wave Sharpness", Range(0.1, 5)) = 1.0
+        _WaveFrequency("Wave Frequency", Range(0.5, 5)) = 1.0
         [Space(10)]
         _FresnelPower("Fresnel Power", Range(1, 10)) = 10
         _Brightness("Brightness", Range(0.5, 3)) = 1.22
@@ -69,6 +71,8 @@ Shader "Custom/SiriLikeEffect"
                 float _WaveSpeed;
                 float _WaveIntensity;
                 float _AudioWaveIntensity;
+                float _WaveSharpness;
+                float _WaveFrequency;
                 float _FresnelPower;
                 float _Brightness;
                 float _AudioBrightnessBoost;
@@ -115,7 +119,13 @@ Shader "Custom/SiriLikeEffect"
                 noiseValue *= _NoiseIntensity;
                 
                 // Wave effect - plus réactif au son
-                float waveVal = sin(pos.y * 8.0 + time) * cos(pos.x * 6.0 + time * 0.7) * sin(pos.z * 7.0 + time * 0.8);
+                float waveVal = sin(pos.y * 8.0 * _WaveFrequency + time) * 
+                               cos(pos.x * 6.0 * _WaveFrequency + time * 0.7) * 
+                               sin(pos.z * 7.0 * _WaveFrequency + time * 0.8);
+                
+                // Application de la sharpness pour contrôler l'aspect pointu/doux
+                float sign = waveVal >= 0 ? 1.0 : -1.0;
+                waveVal = sign * pow(abs(waveVal), 1.0 / _WaveSharpness);
                 
                 // Amplifier les vagues avec le niveau de volume + moyenne des fréquences
                 float audioModulation = (_BassLevel * 0.6 + _MidLevel * 0.3 + _HighLevel * 0.1) * _AudioWaveIntensity;
@@ -174,6 +184,10 @@ Shader "Custom/SiriLikeEffect"
                 // Boost brightness based on audio
                 float audioBrightness = (_BassLevel * 0.3 + _MidLevel * 0.3 + _HighLevel * 0.4) * _AudioBrightnessBoost;
                 finalColor.rgb += fresnel * (_Brightness + audioBrightness);
+                
+    			float centerMask = 1.0 - pow(1.0 - fresnel, 2.0);
+    			finalColor.a *= lerp(0.3, 1.0, centerMask); // Plus transparent au centre (0.3), opaque sur les bords (1.0)
+    
                 
                 // Add subtle noise texture
                 float2 noiseCoord = input.positionWS.xy * _NoiseScale + time;
