@@ -12,6 +12,7 @@ namespace Victeam.AIAssistant
     public class ImageStream : MonoBehaviour
     {
         [SerializeField] private float time = 5f;
+        [SerializeField] private AIAssistantAgent agent;
         [SerializeField] private AudioSource audioSourceGameobject;
 
         private float timeLeft;
@@ -38,8 +39,8 @@ namespace Victeam.AIAssistant
             byte[] fileData = File.ReadAllBytes("Screenshot.png");
             var tex = new Texture2D(2, 2);
             tex.LoadImage(fileData);
-			var resultText = await OpenAICommunicator.Instance.SendPrompt("Describe this image to me", tex);
-            var resultAudioClip = await OpenAICommunicator.Instance.SendTextToSpeech(resultText);
+			var resultText = await agent.Communicator.SendPrompt("Describe this image to me", tex);
+            var resultAudioClip = await agent.Communicator.SendTextToSpeech(resultText);
             audioSource.PlayOneShot(resultAudioClip);
         }
     }
