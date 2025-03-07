@@ -10,39 +10,14 @@ namespace Victeam.AIAssistant
     public class OpenAICommunicator
     {
         private static readonly string apiKey = "";
-        private static readonly string initialPrompt = @"You are a prototype for an AI assistant package in the Unity Game Engine.
-While you may get more specific tasks, your purpose for now is to provide general helpful feedback to the user.
-You will get multiple input formats, including just text, but also images and audio.
-
-Since you are a high-end assistant, hallucinating facts is unacceptable. Be absolutely sure of everything you say, and when you are unable to answer,
-make sure to tell the user.
-Good luck!";
         
-        // ----- SINGLETON PATTERN -----
-        private static OpenAICommunicator instance;
-
-        public static OpenAICommunicator Instance
-        {
-            get
-            {
-                if (instance == null)
-                {
-                    var api = new OpenAIClient(apiKey);
-                    instance = new OpenAICommunicator(api);
-                }
-
-                return instance;
-            }
-        }
-        
-        // -----------------------------
-
         private OpenAIClient client;
         private List<Message> currentConversation = new List<Message>();
+        private readonly string initialPrompt;
 
-        OpenAICommunicator(OpenAIClient client)
+        public OpenAICommunicator(string initialPrompt)
         {
-            this.client = client;
+            client = new OpenAIClient(apiKey);
             currentConversation.Add(new Message(Role.System, initialPrompt));
         }
 

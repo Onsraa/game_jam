@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6195598960454986687}
   - component: {fileID: 7910079631695534084}
+  - component: {fileID: 4795500444397784410}
   m_Layer: 0
   m_Name: AI Assistant Manager
   m_TagString: Untagged
@@ -44,3 +45,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98dc7afd853675e41bc1eec78240357f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  time: 1
+--- !u!114 &4795500444397784410
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6836785587952574338}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d06ff5177a951f4cb4fe67a412171bf, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  initialPrompt: 
